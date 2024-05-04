@@ -1,0 +1,129 @@
+TensorFlow NLP Tutorial: Sentiment Analysis with Movie Reviews
+
+Introduction:
+
+In this practical example, we will delve into sentiment analysis, a popular NLP task that involves classifying the sentiment expressed in text as positive, negative, or neutral. We will utilize TensorFlow and the IMDB movie review dataset to build and train a model capable of predicting the sentiment of movie reviews.
+
+Setting Up the Environment:
+
+Install TensorFlow and TensorFlow Datasets:
+
+pip install tensorflow tensorflow-datasets
+
+
+Import Libraries:
+
+import tensorflow as tf
+import tensorflow_datasets as tfds
+import numpy as np
+
+Loading and Preprocessing the IMDB Dataset:
+
+TensorFlow Datasets provides convenient access to the IMDB dataset, which contains 25,000 movie reviews for training and 25,000 for testing, labeled as positive or negative.
+
+# Load the IMDB dataset
+(train_data, test_data), info = tfds.load(
+    'imdb_reviews/subwords8k',
+    split = (tfds.Split.TRAIN, tfds.Split.TEST),
+    with_info=True, as_supervised=True)
+
+# Explore the data
+train_examples_batch, train_labels_batch = next(iter(train_data.batch(10)))
+print(train_examples_batch)
+print(train_labels_batch)
+
+The dataset provides the reviews as sequences of subword tokens. We will need to pad the sequences to a consistent length for efficient processing.
+
+# Define a function to pad the sequences
+def pad_to_max_length(text, max_length=500):
+    return text + tf.constant([0] * (max_length - tf.shape(text)[0]))
+
+# Pad the training and testing data
+train_data = train_data.map(lambda text, label: (pad_to_max_length(text), label))
+test_data = test_data.map(lambda text, label: (pad_to_max_length(text), label))
+
+
+Building the Sentiment Analysis Model:
+
+We will use a recurrent neural network (RNN) with an LSTM layer to capture the sequential nature of text data and learn long-term dependencies between words.
+
+# Define the model
+model = tf.keras.Sequential([
+    tf.keras.layers.Embedding(info.features['text'].encoder.vocab_size, 64),
+    tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(64)),
+    tf.keras.layers.Dense(64, activation='relu'),
+    tf.keras.layers.Dense(1, activation='sigmoid')
+])
+
+# Compile the model
+model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+
+Training and Evaluation:
+
+We train the model on the training data and evaluate its performance on the test data.
+
+# Train the model
+history = model.fit(train_data.shuffle(10000).batch(64),
+                    epochs=10,
+                    validation_data=test_data.batch(64),
+                    validation_steps=30)
+
+# Evaluate the model
+test_loss, test_acc = model.evaluate(test_data.batch(64))
+print('Test Loss:', test_loss)
+print('Test Accuracy:', test_acc)
+
+
+Visualizing Training Progress:
+
+# Plot the training and validation accuracy and loss
+import matplotlib.pyplot as plt
+
+history_dict = history.history
+acc = history_dict['accuracy']
+val_acc = history_dict['val_accuracy']
+loss = history_dict['loss']
+val_loss = history_dict['val_loss']
+
+epochs = range(1, len(acc) + 1)
+
+plt.plot(epochs, loss, 'bo', label='Training loss')
+plt.plot(epochs, val_loss, 'b', label='Validation loss')
+plt.title('Training and validation loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+plt.show()
+
+plt.plot(epochs, acc, 'bo', label='Training acc')
+plt.plot(epochs, val_acc, 'b', label='Validation acc')
+plt.title('Training and validation accuracy')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend(loc='lower right')
+plt.show()
+
+
+Making Predictions:
+
+Once trained, the model can be used to predict the sentiment of new movie reviews.
+
+# Sample review
+sample_text = ('The movie was absolutely fantastic! The acting was superb, '
+               'the story was gripping, and the visuals were stunning. '
+               'I highly recommend it.')
+
+# Preprocess the sample text
+sample_text_padded = pad_to_max_length(tf.constant([sample_text]))
+sample_text_encoded = info.features['text'].encoder(sample_text_padded)
+
+# Predict the sentiment
+predictions = model.predict(tf.expand_dims(sample_text_encoded, 0))
+sentiment = 'Positive' if predictions > 0.5 else 'Negative'
+print(f'Sentiment: {sentiment}')
+
+
+Conclusion:
+
+This example demonstrated how to build and train a sentiment analysis model using TensorFlow and the IMDB dataset. You can further explore various techniques to improve the model's performance, such as hyperparameter tuning, different network architectures, and pre-trained word embeddings.
